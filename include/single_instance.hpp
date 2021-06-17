@@ -5,12 +5,13 @@
 #include <atomic>
 #include <climits>
 #include <cstring>
+#include <cstdlib>
 
 namespace yba
 {
 	class single_instance
 	{
-		std::atomic_bool bg_run = true;
+		std::atomic_bool bg_run;
 		std::thread bg_checker_thread;
 
 		struct application_presence
@@ -19,7 +20,7 @@ namespace yba
 			char args[4096];
 		};
 
-		ipc<application_presence> ipc;
+		ipc<application_presence> ipc_file;
 
 		int argc;
 		char** argv;
@@ -28,7 +29,7 @@ namespace yba
 		{
 			int new_argc = 0;
 
-			application_presence* presence = ipc.get();
+			application_presence* presence = ipc_file.get();
 			if (!presence)
 				return;
 
@@ -73,14 +74,15 @@ namespace yba
 		};
 
 
-		single_instance(int argc, char* argv[], const char* unique_name, argument_handler* handler = nullptr) : ipc(unique_name), argc(argc), argv(argv), handler(handler)
+		single_instance(int argc, char* argv[], const char* unique_name, argument_handler* handler = nullptr) : ipc_file(unique_name), argc(argc), argv(argv), handler(handler)
 		{
+			bg_run = true;
 			bg_checker_thread = std::thread{
 				[&]
 				{
 					while(bg_run)
 					{
-						application_presence* file = ipc.get();
+						application_presence* file = ipc_file.get();
 						if(file)
 						{
 							if(file->child_written)
@@ -104,18 +106,18 @@ namespace yba
 
 		bool check_single_instance()
 		{
-			if(!ipc.check_exist())
-				return ipc.create();
+			if(!ipc_file.check_exist())
+				return ipc_file.create();
 
-			ipc.open();
+			ipc_file.open();
 			return false;
 		}
 
 		void forward_arguments()
 		{
 			int len = 0;
-			if (!ipc.get()) return;
-			application_presence& presence = *ipc.get();
+			if (!ipc_file.get()) return;
+			application_presence& presence = *ipc_file.get();
 			presence.child_written = false;
 			memset(presence.args, 0, 4096);
 			for(int i = 1;

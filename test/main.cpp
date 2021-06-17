@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <csignal>
 
 struct my_handler : yba::single_instance::argument_handler
 {
@@ -15,6 +16,14 @@ struct my_handler : yba::single_instance::argument_handler
 	}
 };
 
+bool server_is_running = true;
+
+void signal_handler(int sig)
+{
+	std::printf("handling signal %d\n", sig);
+	server_is_running = false;
+}
+
 int main(int argc, char* argv[])
 {
 	my_handler handler;
@@ -22,7 +31,10 @@ int main(int argc, char* argv[])
 	if(instance.check_single_instance())
 	{
 		std::printf("this program is the original instance.\n");
-		for (;;);
+		signal(SIGTERM, signal_handler);
+		signal(SIGINT, signal_handler);
+		signal(SIGQUIT, signal_handler);
+		while(server_is_running);
 	}
 	else
 	{
@@ -31,6 +43,5 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	std::system("pause");
 	return 0;
 }
